@@ -127,4 +127,6 @@ elif page == "Live Feeds":
         st.warning("⚠️ Access Restricted: Please add 'abuseipdb' key to secrets.")
         st.markdown("[Get a free key here](https://www.abuseipdb.com/)")
     elif isinstance(df, pd.DataFrame) and not df.empty:
-        st.dataframe(df[['ipAddress', 'abuseConfidenceScore',
+        st.dataframe(df[['ipAddress', 'abuseConfidenceScore', 'countryCode']], use_container_width=True)
+    else:
+        st.error("Unable to fetch feed.")
