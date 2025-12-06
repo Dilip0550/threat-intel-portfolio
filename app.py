@@ -15,11 +15,13 @@ def get_secret(key_name):
     return None
 
 def clean_html(raw_html):
-    soup = BeautifulSoup(raw_html, "html.parser")
-    return soup.get_text()
+    try:
+        soup = BeautifulSoup(raw_html, "html.parser")
+        return soup.get_text()
+    except:
+        return raw_html
 
 def map_mitre_tactics(tags):
-    """Maps OTX tags to MITRE ATT&CK Tactics"""
     mitre_map = {
         "Phishing": "Initial Access",
         "C2": "Command and Control",
@@ -32,19 +34,24 @@ def map_mitre_tactics(tags):
         "ddos": "Impact",
         "Trojan": "Persistence"
     }
-    detected = []
+    detected = set()
     for tag in tags:
         for keyword, tactic in mitre_map.items():
             if keyword.lower() in tag.lower():
-                detected.append(tactic)
-    return list(set(detected))
+                detected.add(tactic)
+    return list(detected)
 
-# --- API FUNCTIONS ---
+# --- API FUNCTIONS (With Debug Prints) ---
 @st.cache_data(ttl=3600)
 def fetch_cisa_feed():
-    url = "https://www.cisa.gov/uscert/ncas/alerts.xml"
-    feed = feedparser.parse(url)
-    return feed.entries[:10]
+    try:
+        url = "https://www.cisa.gov/uscert/ncas/alerts.xml"
+        feed = feedparser.parse(url)
+        if not feed.entries:
+            return "EMPTY_FEED"
+        return feed.entries[:10]
+    except Exception as e:
+        return f"ERROR: {str(e)}"
 
 def check_virustotal(ip):
     api_key = get_secret("virustotal")
@@ -58,7 +65,9 @@ def check_virustotal(ip):
 
 def check_alienvault(ip):
     api_key = get_secret("alienvault")
-    headers = {"X-OTX-API-KEY": api_key} if api_key else {}
+    if not api_key: return "MISSING_KEY"
+    
+    headers = {"X-OTX-API-KEY": api_key}
     url = f"https://otx.alienvault.com/api/v1/indicators/IPv4/{ip}/general"
     try:
         response = requests.get(url, headers=headers)
@@ -66,9 +75,9 @@ def check_alienvault(ip):
     except: return None
 
 def check_abuseipdb(ip):
-    """Checks a specific IP against AbuseIPDB"""
     api_key = get_secret("abuseipdb")
     if not api_key: return "MISSING_KEY"
+    
     url = "https://api.abuseipdb.com/api/v2/check"
     headers = {"Key": api_key, "Accept": "application/json"}
     params = {"ipAddress": ip, "maxAgeInDays": 90}
@@ -94,78 +103,76 @@ if page == "Dashboard":
 # --- PAGE: IOC SCANNER ---
 elif page == "IOC Scanner":
     st.title("🔍 Deep IOC Analysis")
-    target_ip = st.text_input("Enter IP Address", "185.220.101.43") # Default known bad IP
+    target_ip = st.text_input("Enter IP Address", "185.220.101.43")
     
     if st.button("Run Intelligence Analysis"):
         st.write("---")
         
-        # We use Tabs to organize the 3 feeds clearly
-        tab1, tab2, tab3 = st.tabs(["VirusTotal Analysis", "AlienVault & MITRE", "AbuseIPDB Report"])
+        tab1, tab2, tab3 = st.tabs(["VirusTotal", "AlienVault & MITRE", "AbuseIPDB"])
         
-        # --- TAB 1: VIRUSTOTAL (Detailed) ---
+        # TAB 1: VIRUSTOTAL
         with tab1:
             vt_data = check_virustotal(target_ip)
-            if vt_data and vt_data != "MISSING_KEY":
-                attrs = vt_data.get("data", {}).get("attributes", {})
-                stats = attrs.get("last_analysis_stats", {})
-                
-                # Banner
+            if vt_data == "MISSING_KEY":
+                st.warning("⚠️ VirusTotal API Key is missing in secrets.")
+            elif vt_data:
+                stats = vt_data.get("data", {}).get("attributes", {}).get("last_analysis_stats", {})
                 if stats.get("malicious", 0) > 0:
-                    st.error(f"🚨 **MALICIOUS**: {stats.get('malicious')} Vendors Flagged this IP")
+                    st.error(f"🚨 Malicious: {stats.get('malicious')} vendors")
                 else:
-                    st.success("✅ **CLEAN**: 0 Vendors Flagged this IP")
+                    st.success("✅ Clean")
+                st.json(stats)
 
-                # Detail Table
-                st.subheader("Vendor Detection Details")
-                results = attrs.get("last_analysis_results", {})
-                
-                # Create a list of detections
-                detections = []
-                for vendor, res in results.items():
-                    if res["category"] == "malicious":
-                        detections.append({
-                            "Vendor": vendor,
-                            "Result": res["result"],
-                            "Update": "Recent"
-                        })
-                
-                if detections:
-                    st.table(pd.DataFrame(detections))
-                else:
-                    st.info("No detailed malware family names returned.")
-            else:
-                st.warning("VirusTotal Key missing or API Error.")
-
-        # --- TAB 2: ALIENVAULT & MITRE (Visual) ---
+        # TAB 2: ALIENVAULT & MITRE
         with tab2:
             otx_data = check_alienvault(target_ip)
-            if otx_data:
-                # Get Tags
+            
+            # DEBUG MESSAGES
+            if otx_data == "MISSING_KEY":
+                st.error("❌ AlienVault API Key is missing. MITRE Matrix cannot be generated.")
+                st.markdown("[Get a free key here](https://otx.alienvault.com/)")
+            elif otx_data is None:
+                st.warning("⚠️ Connection to AlienVault failed (Check IP or Key).")
+            else:
+                # If we have data, show the matrix
                 pulses = otx_data.get("pulse_info", {}).get("pulses", [])
                 all_tags = []
                 for p in pulses:
                     all_tags.extend(p.get("tags", []))
                 
-                # Map to MITRE
                 tactics = map_mitre_tactics(list(set(all_tags)))
                 
                 st.subheader("🟥 MITRE ATT&CK Matrix")
-                
-                # Create a visualization dataframe
-                all_tactics = ["Reconnaissance", "Resource Development", "Initial Access", "Execution", "Persistence", "Privilege Escalation", "Defense Evasion", "Credential Access", "Discovery", "Lateral Movement", "Collection", "Command and Control", "Exfiltration", "Impact"]
-                
-                # Create a row of colors
-                matrix_data = {}
-                for t in all_tactics:
-                    matrix_data[t] = ["DETECTED" if t in tactics else "-"]
-                
-                df_matrix = pd.DataFrame(matrix_data)
-                
-                # Display nicely
-                st.dataframe(df_matrix, use_container_width=True)
-                
                 if tactics:
-                    st.markdown(f"**Detected Tactics:** {', '.join(tactics)}")
-                    st.markdown("[🔗 View Full MITRE Framework on mitre.org](https://attack.mitre.org/)")
+                    for t in tactics:
+                        st.warning(f"🛡️ {t}")
                 else:
-                    st.info("No TTPs could be mapped from current intelligence.")
+                    st.info("No MITRE Tactics mapped for this IP.")
+                
+                st.write(f"Associated Campaigns: {len(pulses)}")
+
+        # TAB 3: ABUSEIPDB
+        with tab3:
+            abuse_data = check_abuseipdb(target_ip)
+            if abuse_data == "MISSING_KEY":
+                st.warning("⚠️ AbuseIPDB API Key is missing in secrets.")
+            elif abuse_data:
+                data = abuse_data.get("data", {})
+                st.metric("Confidence Score", f"{data.get('abuseConfidenceScore')}%")
+                st.write(f"ISP: {data.get('isp')}")
+
+# --- PAGE: STRATEGIC INTEL ---
+elif page == "Strategic Intel (CISA)":
+    st.title("📢 Strategic Intelligence Feed")
+    feed_data = fetch_cisa_feed()
+    
+    if feed_data == "EMPTY_FEED":
+        st.warning("Feed fetched but contains no entries.")
+    elif isinstance(feed_data, str) and "ERROR" in feed_data:
+        st.error(f"Failed to load feed. Debug info: {feed_data}")
+        st.info("Did you add 'feedparser' to requirements.txt?")
+    elif feed_data:
+        for entry in feed_data:
+            with st.expander(f"🚨 {entry.title}"):
+                st.write(clean_html(entry.summary))
+                st.markdown(f"[Read Advisory]({entry.link})")
