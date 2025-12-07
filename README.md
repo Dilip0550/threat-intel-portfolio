@@ -2,7 +2,7 @@
 # [AI THREAT AGGREGATOR]
 # 🚀 Try it Live
 Click the link below to run the Live Analysis dashboard without installing anything:
-[**🔗 Open Live Dashboard**](https://https://threat-intel-portfolio-lzpkmfzgnfxigbxnlljglt.streamlit.app/)
+[**🔗 Open Live Dashboard**](https://threat-intel-portfolio-lzpkmfzgnfxigbxnlljglt.streamlit.app/)
 > A comprehensive threat detection and analysis system.
 
 ## 🚀 Latest Changes (v1.1)
