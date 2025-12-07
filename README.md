@@ -62,6 +62,9 @@ This tool allows security analysts to monitor, detect, and analyze potential cyb
 
 ## 🤝 Contributing
 Contributions are welcome. Please fork the repository and create a feature branch for any new threat sources or analysis logic.
+# 🚀 Try it Live
+Click the link below to run the Live Analysis dashboard without installing anything:
+[**🔗 Open Live Dashboard**](https://your-tool.streamlit.app)
 
 ## 📄 License
 Distributed under the MIT License. See `LICENSE` for more information.
