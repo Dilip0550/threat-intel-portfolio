@@ -1,4 +1,4 @@
-[![Run on Replit](https://replit.com/badge/github/[your-username]/[repo-name])](https://replit.com/new/github/[Dilip0550]/[Dilip0550])
+[![Run on Replit](https://replit.com/badge/github/[your-username]/[threat-intel-portfolio])](https://replit.com/new/github/[Dilip0550]/[threat-intel-portfolio])
 # [AI THREAT AGGREGATOR]
 
 > A comprehensive threat detection and analysis system.
