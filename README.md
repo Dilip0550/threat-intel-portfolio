@@ -1,4 +1,6 @@
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/[Dilip0550]/[threat-intel-portfolio]/main)
+# 🚀 Try it Live
+Click the link below to run the Live Analysis dashboard without installing anything:
+[**🔗 Open Live Dashboard**](https://https://threat-intel-portfolio-lzpkmfzgnfxigbxnlljglt.streamlit.app)
 # [AI THREAT AGGREGATOR]
 
 > A comprehensive threat detection and analysis system.
