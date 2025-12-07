@@ -1,4 +1,4 @@
-# [AI Threat AGGREGATOR]
+# [AI THREAT AGGREGATOR]
 
 > A comprehensive threat detection and analysis system.
 
