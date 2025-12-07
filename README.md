@@ -1,6 +1,4 @@
 # 🚀 Try it Live
-Click the link below to run the Live Analysis dashboard without installing anything:
-[**🔗 Open Live Dashboard**](https://https://threat-intel-portfolio-lzpkmfzgnfxigbxnlljglt.streamlit.app)
 # [AI THREAT AGGREGATOR]
 
 > A comprehensive threat detection and analysis system.
@@ -65,8 +63,7 @@ This tool allows security analysts to monitor, detect, and analyze potential cyb
 ## 🤝 Contributing
 Contributions are welcome. Please fork the repository and create a feature branch for any new threat sources or analysis logic.
 # 🚀 Try it Live
-Click the link below to run the Live Analysis dashboard without installing anything:
-[**🔗 Open Live Dashboard**](https://your-tool.streamlit.app)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/[Dilip0550]/[threat-intel-portfolio]/blob/main/demo.ipynb)
 
 ## 📄 License
 Distributed under the MIT License. See `LICENSE` for more information.
