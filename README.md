@@ -1,3 +1,4 @@
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/[Dilip0550]/[threat-intel-portfolio]/main)
 # [AI THREAT AGGREGATOR]
 
 > A comprehensive threat detection and analysis system.
