@@ -115,36 +115,7 @@ if page == "Dashboard":
     col2.metric("Feed Sources", "CISA / Krebs / THN", "Live")
     col3.metric("System Time", datetime.now().strftime("%H:%M"), "UTC")
     st.info("👈 Select **'Strategic Intelligence'** to view live cyber news.")
-    # --- DEBUG SECTION (REMOVE AFTER FIXING) ---
-    st.write("🔍 **Debug Connectivity Check:**")
     
-    # Check AbuseIPDB
-    abuse_key = get_secret("abuseipdb")
-    if abuse_key:
-        test_headers = {"Key": abuse_key, "Accept": "application/json"}
-        # Check a known bad IP to force a result
-        test_resp = requests.get("https://api.abuseipdb.com/api/v2/check", headers=test_headers, params={"ipAddress": "185.220.101.43"})
-        if test_resp.status_code == 200:
-            st.success(f"✅ AbuseIPDB Connected! (Code 200)")
-        elif test_resp.status_code == 401:
-            st.error(f"❌ AbuseIPDB Unauthorized (401). Check your Key! You might have copied extra spaces.")
-        else:
-            st.warning(f"⚠️ AbuseIPDB Error: {test_resp.status_code}")
-    
-    # Check AlienVault
-    alien_key = get_secret("alienvault")
-    if alien_key:
-        otx_headers = {"X-OTX-API-KEY": alien_key}
-        otx_resp = requests.get("https://otx.alienvault.com/api/v1/users/me", headers=otx_headers)
-        if otx_resp.status_code == 200:
-            st.success(f"✅ AlienVault Connected! (Code 200)")
-        elif otx_resp.status_code == 403 or otx_resp.status_code == 401:
-            st.error(f"❌ AlienVault Permission Denied ({otx_resp.status_code}). You likely pasted the wrong key.")
-        else:
-            st.warning(f"⚠️ AlienVault Error: {otx_resp.status_code}")
-    st.write("---")
-    # --- END DEBUG SECTION ---
-
 # --- PAGE: IOC SCANNER ---
 elif page == "IOC Scanner":
     st.title("🔍 Deep IOC Analysis")
