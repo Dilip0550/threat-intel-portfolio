@@ -41,21 +41,20 @@ def map_mitre_tactics(tags):
                 detected.add(tactic)
     return list(detected)
 
-# --- API FUNCTIONS (With Debug Prints) ---
+# --- API FUNCTIONS ---
 @st.cache_data(ttl=3600)
 def fetch_cisa_feed():
     try:
         url = "https://www.cisa.gov/uscert/ncas/alerts.xml"
         feed = feedparser.parse(url)
-        if not feed.entries:
-            return "EMPTY_FEED"
         return feed.entries[:10]
-    except Exception as e:
-        return f"ERROR: {str(e)}"
+    except:
+        return []
 
 def check_virustotal(ip):
     api_key = get_secret("virustotal")
     if not api_key: return "MISSING_KEY"
+    
     url = f"https://www.virustotal.com/api/v3/ip_addresses/{ip}"
     headers = {"x-apikey": api_key}
     try:
@@ -65,6 +64,7 @@ def check_virustotal(ip):
 
 def check_alienvault(ip):
     api_key = get_secret("alienvault")
+    # Even if key is missing, we try to return None so UI handles it gracefully
     if not api_key: return "MISSING_KEY"
     
     headers = {"X-OTX-API-KEY": api_key}
@@ -90,17 +90,20 @@ def check_abuseipdb(ip):
 st.sidebar.title("🛡️ Intel Ops")
 page = st.sidebar.radio("Modules", ["Dashboard", "IOC Scanner", "Strategic Intel (CISA)"])
 st.sidebar.markdown("---")
+st.sidebar.caption("Status:")
+if get_secret("virustotal"): st.sidebar.success("VT Key Loaded")
+else: st.sidebar.error("VT Key Missing")
 
-# --- PAGE: DASHBOARD ---
+# --- DASHBOARD ---
 if page == "Dashboard":
     st.title("Threat Intelligence Platform")
     col1, col2, col3 = st.columns(3)
-    col1.metric("Framework", "MITRE ATT&CK", "Integrated")
+    col1.metric("Framework", "MITRE ATT&CK", "Active")
     col2.metric("Scan Engine", "Multi-Vector", "Online")
     col3.metric("System Time", datetime.now().strftime("%H:%M"), "UTC")
-    st.info("👈 Select **'IOC Scanner'** to investigate an IP.")
+    st.info("👈 Go to **IOC Scanner** to analyze an IP.")
 
-# --- PAGE: IOC SCANNER ---
+# --- IOC SCANNER ---
 elif page == "IOC Scanner":
     st.title("🔍 Deep IOC Analysis")
     target_ip = st.text_input("Enter IP Address", "185.220.101.43")
@@ -108,71 +111,115 @@ elif page == "IOC Scanner":
     if st.button("Run Intelligence Analysis"):
         st.write("---")
         
-        tab1, tab2, tab3 = st.tabs(["VirusTotal", "AlienVault & MITRE", "AbuseIPDB"])
+        # TABS FOR CLEAN LAYOUT
+        tab1, tab2, tab3 = st.tabs(["VirusTotal Report", "AlienVault & MITRE", "AbuseIPDB Check"])
         
-        # TAB 1: VIRUSTOTAL
+        # --- TAB 1: VIRUSTOTAL (Clean Table, No JSON) ---
         with tab1:
             vt_data = check_virustotal(target_ip)
+            
             if vt_data == "MISSING_KEY":
-                st.warning("⚠️ VirusTotal API Key is missing in secrets.")
+                st.warning("⚠️ VirusTotal API Key is missing.")
             elif vt_data:
-                stats = vt_data.get("data", {}).get("attributes", {}).get("last_analysis_stats", {})
-                if stats.get("malicious", 0) > 0:
-                    st.error(f"🚨 Malicious: {stats.get('malicious')} vendors")
+                # 1. High Level Stats
+                attrs = vt_data.get("data", {}).get("attributes", {})
+                stats = attrs.get("last_analysis_stats", {})
+                malicious = stats.get("malicious", 0)
+                
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Malicious Flags", malicious)
+                c2.metric("Harmless Flags", stats.get("harmless", 0))
+                c3.metric("Reputation", attrs.get("reputation", 0))
+                
+                if malicious > 0:
+                    st.error(f"🚨 **Verdict: MALICIOUS**")
                 else:
-                    st.success("✅ Clean")
-                st.json(stats)
+                    st.success("✅ **Verdict: CLEAN**")
 
-        # TAB 2: ALIENVAULT & MITRE
+                # 2. Detailed Vendor Table (Parsing the JSON)
+                st.subheader("Vendor Detection Details")
+                results = attrs.get("last_analysis_results", {})
+                
+                # Loop through the JSON and make a list
+                table_data = []
+                for vendor, details in results.items():
+                    # Only show vendors that flagged it or failed, skip the 'undetected' ones to keep it clean
+                    if details['category'] in ['malicious', 'suspicious']:
+                        table_data.append({
+                            "Vendor": vendor,
+                            "Result": details['result'],
+                            "Category": details['category']
+                        })
+                
+                if table_data:
+                    st.table(pd.DataFrame(table_data))
+                else:
+                    st.info("No vendors flagged this IP as malicious.")
+                    
+            else:
+                st.error("Could not connect to VirusTotal.")
+
+        # --- TAB 2: ALIENVAULT & MITRE ---
         with tab2:
             otx_data = check_alienvault(target_ip)
             
-            # DEBUG MESSAGES
             if otx_data == "MISSING_KEY":
-                st.error("❌ AlienVault API Key is missing. MITRE Matrix cannot be generated.")
-                st.markdown("[Get a free key here](https://otx.alienvault.com/)")
-            elif otx_data is None:
-                st.warning("⚠️ Connection to AlienVault failed (Check IP or Key).")
-            else:
-                # If we have data, show the matrix
+                st.warning("⚠️ AlienVault Key Missing. MITRE matrix disabled.")
+                st.markdown("[Get Free Key](https://otx.alienvault.com/)")
+            elif otx_data:
                 pulses = otx_data.get("pulse_info", {}).get("pulses", [])
+                
+                # MITRE MAPPING
                 all_tags = []
                 for p in pulses:
                     all_tags.extend(p.get("tags", []))
-                
                 tactics = map_mitre_tactics(list(set(all_tags)))
                 
                 st.subheader("🟥 MITRE ATT&CK Matrix")
                 if tactics:
-                    for t in tactics:
-                        st.warning(f"🛡️ {t}")
+                    # Visual Matrix
+                    cols = st.columns(len(tactics))
+                    for idx, t in enumerate(tactics):
+                        cols[idx].error(f"🛡️ {t}")
                 else:
-                    st.info("No MITRE Tactics mapped for this IP.")
-                
-                st.write(f"Associated Campaigns: {len(pulses)}")
+                    st.info("No MITRE Tactics mapped.")
 
-        # TAB 3: ABUSEIPDB
+                # CAMPAIGNS
+                st.subheader("Associated Threat Campaigns")
+                if pulses:
+                    for p in pulses[:5]:
+                        st.markdown(f"- 🔗 [{p['name']}](https://otx.alienvault.com/pulse/{p['id']})")
+                else:
+                    st.write("No known campaigns associated.")
+
+        # --- TAB 3: ABUSEIPDB ---
         with tab3:
             abuse_data = check_abuseipdb(target_ip)
             if abuse_data == "MISSING_KEY":
-                st.warning("⚠️ AbuseIPDB API Key is missing in secrets.")
+                st.warning("⚠️ AbuseIPDB Key Missing.")
             elif abuse_data:
                 data = abuse_data.get("data", {})
-                st.metric("Confidence Score", f"{data.get('abuseConfidenceScore')}%")
-                st.write(f"ISP: {data.get('isp')}")
+                score = data.get("abuseConfidenceScore", 0)
+                
+                st.metric("Abuse Confidence Score", f"{score}%")
+                st.progress(score / 100)
+                
+                st.write(f"**ISP:** {data.get('isp')}")
+                st.write(f"**Country:** {data.get('countryCode')}")
+                
+                if score > 50:
+                    st.error("High probability of abusive behavior.")
+                else:
+                    st.success("Low probability of abusive behavior.")
 
-# --- PAGE: STRATEGIC INTEL ---
+# --- STRATEGIC INTEL ---
 elif page == "Strategic Intel (CISA)":
-    st.title("📢 Strategic Intelligence Feed")
-    feed_data = fetch_cisa_feed()
-    
-    if feed_data == "EMPTY_FEED":
-        st.warning("Feed fetched but contains no entries.")
-    elif isinstance(feed_data, str) and "ERROR" in feed_data:
-        st.error(f"Failed to load feed. Debug info: {feed_data}")
-        st.info("Did you add 'feedparser' to requirements.txt?")
-    elif feed_data:
-        for entry in feed_data:
+    st.title("📢 Strategic Intelligence Feed (CISA)")
+    feed = fetch_cisa_feed()
+    if feed:
+        for entry in feed:
             with st.expander(f"🚨 {entry.title}"):
                 st.write(clean_html(entry.summary))
-                st.markdown(f"[Read Advisory]({entry.link})")
+                st.markdown(f"[Read Full Advisory]({entry.link})")
+    else:
+        st.error("Unable to fetch CISA feed.")
