@@ -1,4 +1,4 @@
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/[Dilip0550]/[threat-intel-portfolio]/main)
+[![Run on Replit](https://replit.com/badge/github/[your-username]/[repo-name])](https://replit.com/new/github/[Dilip0550]/[Dilip0550])
 # [AI THREAT AGGREGATOR]
 
 > A comprehensive threat detection and analysis system.
